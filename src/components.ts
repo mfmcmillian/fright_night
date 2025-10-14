@@ -1,7 +1,7 @@
 import { Schemas, engine } from '@dcl/sdk/ecs'
 
 // Animation states
-export type AnimationState = 'idle' | 'run' | 'attack' | 'impact'
+export type AnimationState = 'idle' | 'run' | 'attack' | 'impact' | 'stun' | 'die' | 'block'
 
 // Fighter component - ECS-based fighter data
 export const FighterComponent = engine.defineComponent('fighter::component', {
@@ -11,7 +11,15 @@ export const FighterComponent = engine.defineComponent('fighter::component', {
   animationTimer: Schemas.Number, // For timed animation resets
   currentAnimation: Schemas.String,
   invincibilityTimer: Schemas.Number, // I-frames after hit (prevents spam damage)
-  attackCooldown: Schemas.Number // Per-fighter attack cooldown
+  attackCooldown: Schemas.Number, // Per-fighter attack cooldown
+  stunTimer: Schemas.Number, // Hit stun duration (0.2s, blocks all actions)
+  blocking: Schemas.Boolean, // Is currently blocking (reduces damage 50%)
+  knockbackActive: Schemas.Boolean, // Is currently being knocked back
+  knockbackProgress: Schemas.Number, // 0-1 progress through knockback
+  knockbackDirX: Schemas.Number, // Knockback direction X
+  knockbackDirY: Schemas.Number, // Knockback direction Y
+  knockbackDirZ: Schemas.Number, // Knockback direction Z
+  animRampProgress: Schemas.Number // 0-1 for smooth animation speed ramp (0.1s blend)
 })
 
 // Animation timer component - tracks when to reset animations

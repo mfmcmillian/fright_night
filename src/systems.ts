@@ -4,11 +4,15 @@ import { FighterComponent, ARENA_CONFIG, AnimationState, GameState } from './com
 import { getGameState } from './factory'
 
 // Movement constants
-const MOVEMENT_SPEED = 3.0
-const ENEMY_SPEED = 2.1
+const MOVEMENT_SPEED = 4.0 // Faster movement for more tactical positioning
+const ENEMY_SPEED = 3.2 // AI needs to keep up
 
 // Combat constants
 const COMBO_TIMEOUT = 1.5 // Seconds between hits to maintain combo
+const KNOCKBACK_FORCE = 1.5 // Distance to push opponent back
+const KNOCKBACK_DURATION = 0.25 // Smooth knockback over 0.25s
+const STUN_DURATION = 0.2 // Hit stun duration
+const HIT_RANGE = 2.0 // Shorter range - must get close to hit (down from 2.5)
 
 // Track hit detection per attack animation
 const pendingHitChecks = new Map<Entity, number>()
@@ -95,12 +99,53 @@ export function unifiedTimerSystem(dt: number) {
       mutableFighter.attackCooldown -= dt
     }
 
+    // Stun timer (blocks all actions)
+    if (mutableFighter.stunTimer > 0) {
+      mutableFighter.stunTimer -= dt
+    }
+
     // Animation timer
     if (mutableFighter.animationTimer > 0) {
       mutableFighter.animationTimer -= dt
 
       if (mutableFighter.animationTimer <= 0) {
         resetToIdle(entity)
+      }
+    }
+
+    // Knockback slide (smooth pushback over time)
+    if (mutableFighter.knockbackActive) {
+      mutableFighter.knockbackProgress += dt / KNOCKBACK_DURATION
+      const progress = Math.min(1, mutableFighter.knockbackProgress)
+
+      // Ease out for smooth deceleration
+      const easeProgress = 1 - Math.pow(1 - progress, 3)
+
+      // Reconstruct knockback direction
+      const knockbackDir = Vector3.create(
+        mutableFighter.knockbackDirX,
+        mutableFighter.knockbackDirY,
+        mutableFighter.knockbackDirZ
+      )
+
+      // Apply smooth slide (slows down over time)
+      const slideSpeed = (KNOCKBACK_FORCE / KNOCKBACK_DURATION) * (1 - easeProgress)
+      const slideDistance = Vector3.scale(knockbackDir, slideSpeed * dt)
+
+      const transform = Transform.getMutable(entity)
+      let newPos = Vector3.add(transform.position, slideDistance)
+
+      // Constrain to arena
+      newPos.x = Math.max(ARENA_CONFIG.xMin, Math.min(ARENA_CONFIG.xMax, newPos.x))
+      newPos.z = Math.max(ARENA_CONFIG.zMin, Math.min(ARENA_CONFIG.zMax, newPos.z))
+      newPos.y = 0
+
+      transform.position = newPos
+
+      // End knockback when complete
+      if (progress >= 1) {
+        mutableFighter.knockbackActive = false
+        mutableFighter.knockbackProgress = 0
       }
     }
   }
@@ -138,26 +183,56 @@ export function playerMovementSystem(dt: number) {
 
   if (!transform || !fighter) return
 
-  // Skip if dead, animation-locked, or invincible
+  // Skip if dead, animation-locked, stunned, OR during attack cooldown grace period
   if (fighter.health <= 0) return
-  if (fighter.animationTimer > 0 || fighter.invincibilityTimer > 0) {
+  if (fighter.animationTimer > 0 || fighter.stunTimer > 0) {
     return
+  }
+
+  // Prevent movement during early attack cooldown (prevents run animation flicker when spamming E)
+  const isInAttackRecovery = fighter.attackCooldown > 0.6 // First 0.2s of 0.8s cooldown
+  if (isInAttackRecovery) {
+    // Still allow blocking during recovery, but no movement
+    const isBlocking = inputSystem.isPressed(InputAction.IA_SECONDARY)
+    if (isBlocking && fighter.currentAnimation !== 'block') {
+      fighter.blocking = true
+      playAnimation(player, 'block')
+    } else if (!isBlocking && fighter.currentAnimation === 'block') {
+      fighter.blocking = false
+      playAnimation(player, 'idle')
+    }
+    return // Block movement input during attack recovery
+  }
+
+  // Block input (F key = IA_SECONDARY) - Blocks movement but not attacks
+  const isBlocking = inputSystem.isPressed(InputAction.IA_SECONDARY)
+
+  if (isBlocking) {
+    fighter.blocking = true
+    if (fighter.currentAnimation !== 'block') {
+      playAnimation(player, 'block')
+    }
+  } else {
+    fighter.blocking = false
   }
 
   // Read input using SDK7 inputSystem (polling-based)
   let moveX = 0
   let moveZ = 0
 
-  if (inputSystem.isPressed(InputAction.IA_RIGHT)) moveX += 1 // D key
-  if (inputSystem.isPressed(InputAction.IA_LEFT)) moveX -= 1 // A key
-  if (inputSystem.isPressed(InputAction.IA_FORWARD)) moveZ += 1 // W key
-  if (inputSystem.isPressed(InputAction.IA_BACKWARD)) moveZ -= 1 // S key
+  // Can't move while blocking
+  if (!isBlocking) {
+    if (inputSystem.isPressed(InputAction.IA_RIGHT)) moveX += 1 // D key
+    if (inputSystem.isPressed(InputAction.IA_LEFT)) moveX -= 1 // A key
+    if (inputSystem.isPressed(InputAction.IA_FORWARD)) moveZ += 1 // W key
+    if (inputSystem.isPressed(InputAction.IA_BACKWARD)) moveZ -= 1 // S key
+  }
 
   const movement = Vector3.create(moveX, 0, moveZ)
   const movementLength = Vector3.length(movement)
 
-  // Apply movement with normalized diagonals
-  if (movementLength > 0.1) {
+  // Apply movement with normalized diagonals (only if not blocking)
+  if (movementLength > 0.1 && !isBlocking) {
     const normalizedMovement = Vector3.normalize(movement)
     const velocity = Vector3.scale(normalizedMovement, MOVEMENT_SPEED * dt)
 
@@ -180,13 +255,14 @@ export function playerMovementSystem(dt: number) {
     const moveAngle = Math.atan2(moveX, moveZ) * (180 / Math.PI)
     const targetRotation = Quaternion.fromEulerDegrees(0, moveAngle, 0)
     transform.rotation = Quaternion.slerp(transform.rotation, targetRotation, dt * 5)
-  } else if (fighter.currentAnimation !== 'idle') {
-    // Return to idle when not moving
+  } else if (fighter.currentAnimation !== 'idle' && !isBlocking) {
+    // Return to idle when not moving (and not blocking)
     playAnimation(player, 'idle')
   }
 
-  // Attack input (E key or Primary button) with cooldown
+  // Attack input (E key or Primary button) with cooldown - Can attack while blocking (block-cancel into attack)
   if (inputSystem.isPressed(InputAction.IA_PRIMARY) && fighter.attackCooldown <= 0) {
+    fighter.blocking = false // Cancel block on attack
     performAttack(player)
   }
 }
@@ -230,12 +306,55 @@ function checkAttackHit(attacker: Entity) {
 
   // Check distance
   const distance = Vector3.distance(attackerTransform.position, opponentTransform.position)
-  const hitRange = 2.5
+  const hitRange = HIT_RANGE
 
   if (distance < hitRange) {
-    // Hit landed!
-    applyDamage(opponent, 15)
-    console.log(`💥 ${attackerFighter.isPlayer ? 'Player' : 'Enemy'} hit! Distance: ${distance.toFixed(2)}m`)
+    // Check if opponent is blocking
+    if (opponentFighter.blocking) {
+      // Blocked! Reduce damage by 50%
+      applyDamage(opponent, 7.5) // 15 * 0.5 = 7.5
+      console.log(`🛡️ ${opponentFighter.isPlayer ? 'Player' : 'Enemy'} BLOCKED! Reduced damage`)
+
+      // No knockback or stun on block, but play impact animation
+      playAnimation(opponent, 'impact', 300)
+    } else {
+      // Hit landed unblocked!
+      applyDamage(opponent, 15)
+
+      // Check current combo count from game state
+      const gameStateEntity = getGameState()
+      const currentCombo = gameStateEntity ? GameState.getOrNull(gameStateEntity)?.comboCount || 0 : 0
+
+      // Apply SMOOTH knockback ONLY on 3+ hit combos
+      if (currentCombo >= 3) {
+        const pushDir = Vector3.normalize(Vector3.subtract(opponentTransform.position, attackerTransform.position))
+        const opponentMutableFighter = FighterComponent.getMutable(opponent)
+
+        // Store knockback direction
+        opponentMutableFighter.knockbackDirX = pushDir.x
+        opponentMutableFighter.knockbackDirY = pushDir.y
+        opponentMutableFighter.knockbackDirZ = pushDir.z
+
+        // Activate smooth knockback slide
+        opponentMutableFighter.knockbackActive = true
+        opponentMutableFighter.knockbackProgress = 0
+
+        console.log(`🔥 ${currentCombo} HIT COMBO! KNOCKBACK!`)
+      }
+
+      // Apply stun (blocks all actions for 0.2s) - always on hit
+      const opponentMutableFighter = FighterComponent.getMutable(opponent)
+      opponentMutableFighter.stunTimer = STUN_DURATION
+
+      console.log(
+        `💥 ${attackerFighter.isPlayer ? 'Player' : 'Enemy'} hit! Distance: ${distance.toFixed(2)}m | Stun applied!`
+      )
+    }
+  } else {
+    // WHIFF PUNISHMENT: Missed attack = longer cooldown (punish spam!)
+    const attackerMutableFighter = FighterComponent.getMutable(attacker)
+    attackerMutableFighter.attackCooldown += 0.3 // Add 0.3s penalty to cooldown
+    console.log(`⚠️ ${attackerFighter.isPlayer ? 'Player' : 'Enemy'} WHIFFED! Longer recovery`)
   }
 }
 
@@ -326,6 +445,14 @@ export function resetMatch() {
       playerFighter.animationTimer = 0
       playerFighter.invincibilityTimer = 0
       playerFighter.attackCooldown = 0
+      playerFighter.stunTimer = 0
+      playerFighter.blocking = false
+      playerFighter.knockbackActive = false
+      playerFighter.knockbackProgress = 0
+      playerFighter.knockbackDirX = 0
+      playerFighter.knockbackDirY = 0
+      playerFighter.knockbackDirZ = 0
+      playerFighter.animRampProgress = 1.0
       playerTransform.position = Vector3.create(ARENA_CONFIG.player.x, ARENA_CONFIG.player.y, ARENA_CONFIG.player.z)
       playerTransform.rotation = Quaternion.fromEulerDegrees(0, 90, 0)
 
@@ -352,6 +479,14 @@ export function resetMatch() {
       enemyFighter.animationTimer = 0
       enemyFighter.invincibilityTimer = 0
       enemyFighter.attackCooldown = 0
+      enemyFighter.stunTimer = 0
+      enemyFighter.blocking = false
+      enemyFighter.knockbackActive = false
+      enemyFighter.knockbackProgress = 0
+      enemyFighter.knockbackDirX = 0
+      enemyFighter.knockbackDirY = 0
+      enemyFighter.knockbackDirZ = 0
+      enemyFighter.animRampProgress = 1.0
       enemyTransform.position = Vector3.create(ARENA_CONFIG.enemy.x, ARENA_CONFIG.enemy.y, ARENA_CONFIG.enemy.z)
       enemyTransform.rotation = Quaternion.fromEulerDegrees(0, -90, 0)
 
@@ -442,41 +577,69 @@ export function enemyAISystem(dt: number) {
 
   if (!enemyTransform || !enemyFighter || !playerTransform || !playerFighter) return
 
-  // Don't act if dead or during animations/i-frames
+  // Don't act if dead or during animations/stun
   if (enemyFighter.health <= 0 || playerFighter.health <= 0) return
-  if (enemyFighter.animationTimer > 0 || enemyFighter.invincibilityTimer > 0) return
+  if (enemyFighter.animationTimer > 0 || enemyFighter.stunTimer > 0) return
 
   // Calculate distance to player
   const distance = Vector3.distance(enemyTransform.position, playerTransform.position)
   const rand = Math.random()
 
-  // AI behavior based on distance
-  if (distance > 2.2) {
-    // Chase player
-    const direction = Vector3.subtract(playerTransform.position, enemyTransform.position)
-    direction.y = 0
-    const normalizedDirection = Vector3.normalize(direction)
-    const velocity = Vector3.scale(normalizedDirection, ENEMY_SPEED * dt)
+  // Smart blocking logic - block when player is close and likely to attack
+  const playerFighterState = FighterComponent.getOrNull(player)
+  const shouldConsiderBlocking = distance < 2.5 && playerFighterState && playerFighterState.attackCooldown <= 0.3
 
-    let newPosition = Vector3.add(enemyTransform.position, velocity)
-
-    // Constrain to arena
-    newPosition.x = Math.max(ARENA_CONFIG.xMin, Math.min(ARENA_CONFIG.xMax, newPosition.x))
-    newPosition.z = Math.max(ARENA_CONFIG.zMin, Math.min(ARENA_CONFIG.zMax, newPosition.z))
-    newPosition.y = 0
-
-    enemyTransform.position = newPosition
-
-    if (enemyFighter.currentAnimation !== 'run') {
-      playAnimation(enemy, 'run')
+  // AI decides to block (0.5% chance per frame = occasional blocking, not constant)
+  if (shouldConsiderBlocking && rand < 0.005) {
+    enemyFighter.blocking = true
+    if (enemyFighter.currentAnimation !== 'block') {
+      playAnimation(enemy, 'block')
     }
-  } else if (distance <= 2.2) {
-    // In attack range - attack more frequently
-    if (rand < 0.05 && enemyFighter.attackCooldown <= 0) {
-      // ~5% chance per frame = attacks every ~1 second when in range
-      performAttack(enemy)
-    } else if (enemyFighter.currentAnimation !== 'idle' && enemyFighter.currentAnimation !== 'attack') {
-      playAnimation(enemy, 'idle')
+  } else if (rand < 0.01) {
+    // Stop blocking with slightly higher chance to not get stuck
+    enemyFighter.blocking = false
+  }
+
+  // AI behavior based on distance (only if not blocking)
+  if (!enemyFighter.blocking) {
+    // AGGRESSIVE: Punish player during their attack cooldown (they're vulnerable!)
+    const playerIsVulnerable = playerFighterState && playerFighterState.attackCooldown > 0.4
+
+    if (distance > 2.0) {
+      // Chase player (adjusted to match new HIT_RANGE)
+      const direction = Vector3.subtract(playerTransform.position, enemyTransform.position)
+      direction.y = 0
+      const normalizedDirection = Vector3.normalize(direction)
+      const velocity = Vector3.scale(normalizedDirection, ENEMY_SPEED * dt)
+
+      let newPosition = Vector3.add(enemyTransform.position, velocity)
+
+      // Constrain to arena
+      newPosition.x = Math.max(ARENA_CONFIG.xMin, Math.min(ARENA_CONFIG.xMax, newPosition.x))
+      newPosition.z = Math.max(ARENA_CONFIG.zMin, Math.min(ARENA_CONFIG.zMax, newPosition.z))
+      newPosition.y = 0
+
+      enemyTransform.position = newPosition
+
+      if (enemyFighter.currentAnimation !== 'run') {
+        playAnimation(enemy, 'run')
+      }
+    } else if (distance <= 2.3) {
+      // In attack range - MUCH more aggressive (slightly beyond HIT_RANGE for pressure)
+
+      // If player just attacked, PUNISH THEM! (20% chance - easier now)
+      if (playerIsVulnerable && rand < 0.2 && enemyFighter.attackCooldown <= 0) {
+        performAttack(enemy)
+        console.log('🔥 AI PUNISHED YOUR WHIFF!')
+      }
+      // Normal attacks (3% chance per frame = attacks every ~0.5 seconds - much easier)
+      else if (rand < 0.03 && enemyFighter.attackCooldown <= 0) {
+        performAttack(enemy)
+      }
+      // Idle
+      else if (enemyFighter.currentAnimation !== 'idle' && enemyFighter.currentAnimation !== 'attack') {
+        playAnimation(enemy, 'idle')
+      }
     }
   }
 

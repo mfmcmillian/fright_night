@@ -11,7 +11,9 @@ const FIGHTER_ANIMATIONS = [
   { clip: 'run', playing: false, loop: true },
   { clip: 'attack', playing: false, loop: false },
   { clip: 'impact', playing: false, loop: false },
-  { clip: 'die', playing: false, loop: false }
+  { clip: 'stun', playing: false, loop: false },
+  { clip: 'die', playing: false, loop: false },
+  { clip: 'block', playing: false, loop: true }
 ]
 
 /**
@@ -146,7 +148,15 @@ export function createFighter(modelPath: string, position: Vector3, rotation: Qu
     animationTimer: 0,
     currentAnimation: 'idle',
     invincibilityTimer: 0,
-    attackCooldown: 0
+    attackCooldown: 0,
+    stunTimer: 0,
+    blocking: false,
+    knockbackActive: false,
+    knockbackProgress: 0,
+    knockbackDirX: 0,
+    knockbackDirY: 0,
+    knockbackDirZ: 0,
+    animRampProgress: 1.0
   })
 
   // Animator with standard states

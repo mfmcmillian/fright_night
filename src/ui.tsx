@@ -82,9 +82,9 @@ const uiComponent = () => {
             />
           </UiEntity>
           <Label
-            value={`HP: ${p1Health}/${p1MaxHealth} | ${p1Anim.toUpperCase()}`}
+            value={`HP: ${p1Health}/${p1MaxHealth} | ${p1Anim.toUpperCase()}${playerFighter && playerFighter.blocking ? ' | 🛡️ BLOCKING' : ''}`}
             fontSize={14}
-            color={Color4.White()}
+            color={playerFighter && playerFighter.blocking ? Color4.create(0.3, 0.8, 1, 1) : Color4.White()}
             uiTransform={{ width: '100%', height: 20 }}
           />
         </UiEntity>
@@ -147,9 +147,9 @@ const uiComponent = () => {
             />
           </UiEntity>
           <Label
-            value={`HP: ${p2Health}/${p2MaxHealth} | ${p2Anim.toUpperCase()}`}
+            value={`HP: ${p2Health}/${p2MaxHealth} | ${p2Anim.toUpperCase()}${enemyFighter && enemyFighter.blocking ? ' | 🛡️ BLOCKING' : ''}`}
             fontSize={14}
-            color={Color4.White()}
+            color={enemyFighter && enemyFighter.blocking ? Color4.create(0.3, 0.8, 1, 1) : Color4.White()}
             uiTransform={{ width: '100%', height: 20 }}
           />
         </UiEntity>
@@ -173,18 +173,18 @@ const uiComponent = () => {
           color={Color4.Yellow()}
           uiTransform={{ width: '100%', height: 30, margin: {top: 10} }}
         />
-        <Label
-          value="WASD - Move | E - Attack"
-          fontSize={14}
-          color={Color4.White()}
-          uiTransform={{ width: '100%', height: 25 }}
-        />
-        <Label
-          value="Get close to your opponent to land hits!"
-          fontSize={12}
-          color={Color4.Gray()}
-          uiTransform={{ width: '100%', height: 25 }}
-        />
+              <Label
+                value="WASD - Move | E - Attack | F - Block"
+                fontSize={14}
+                color={Color4.White()}
+                uiTransform={{ width: '100%', height: 25 }}
+              />
+              <Label
+                value="Block reduces damage by 50% | AI will block smart!"
+                fontSize={12}
+                color={Color4.Gray()}
+                uiTransform={{ width: '100%', height: 25 }}
+              />
         <Label
           value="Enemy AI will chase and attack you!"
           fontSize={12}
