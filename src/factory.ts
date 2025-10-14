@@ -40,72 +40,118 @@ export function getGameState(): Entity | null {
 }
 
 /**
+ * Create simple skybox cube around the arena using textured planes
+ */
+function createSkybox(): void {
+  const skyboxSize = 15 // Fits within 1 parcel (16x16)
+  const skyboxHeight = 12
+  const skyboxRoot = engine.addEntity()
+  arenaEntities.push(skyboxRoot)
+
+  Transform.create(skyboxRoot, {
+    position: Vector3.create(8, 6, 8) // Centered at arena position
+  })
+
+  // Front (PZ) - facing inward (negative Z direction)
+  const skyboxPZ = engine.addEntity()
+  arenaEntities.push(skyboxPZ)
+  Transform.create(skyboxPZ, {
+    position: Vector3.create(0, 0, skyboxSize / 2),
+    rotation: Quaternion.fromEulerDegrees(0, 180, 0), // Flip to face inward
+    scale: Vector3.create(skyboxSize, skyboxHeight, 1),
+    parent: skyboxRoot
+  })
+  MeshRenderer.setPlane(skyboxPZ)
+  Material.setBasicMaterial(skyboxPZ, {
+    texture: Material.Texture.Common({ src: 'images/creepy-skybox/nz.png' }) // Swapped NZ and PZ
+  })
+
+  // Back (NZ) - facing inward (positive Z direction)
+  const skyboxNZ = engine.addEntity()
+  arenaEntities.push(skyboxNZ)
+  Transform.create(skyboxNZ, {
+    position: Vector3.create(0, 0, -skyboxSize / 2),
+    rotation: Quaternion.fromEulerDegrees(0, 0, 0), // Face inward
+    scale: Vector3.create(skyboxSize, skyboxHeight, 1),
+    parent: skyboxRoot
+  })
+  MeshRenderer.setPlane(skyboxNZ)
+  Material.setBasicMaterial(skyboxNZ, {
+    texture: Material.Texture.Common({ src: 'images/creepy-skybox/pz.png' }) // Swapped NZ and PZ
+  })
+
+  // Top (PY) - facing down
+  const skyboxPY = engine.addEntity()
+  arenaEntities.push(skyboxPY)
+  Transform.create(skyboxPY, {
+    position: Vector3.create(0, skyboxHeight / 2, 0),
+    rotation: Quaternion.fromEulerDegrees(90, 0, 0), // Flip to face down
+    scale: Vector3.create(skyboxSize, skyboxSize, 1),
+    parent: skyboxRoot
+  })
+  MeshRenderer.setPlane(skyboxPY)
+  Material.setBasicMaterial(skyboxPY, {
+    texture: Material.Texture.Common({ src: 'images/creepy-skybox/py.png' })
+  })
+
+  // Bottom (NY) - facing up
+  const skyboxNY = engine.addEntity()
+  arenaEntities.push(skyboxNY)
+  Transform.create(skyboxNY, {
+    position: Vector3.create(0, -skyboxHeight / 2, 0),
+    rotation: Quaternion.fromEulerDegrees(-90, 180, 0), // Flip to face up + rotate 180
+    scale: Vector3.create(skyboxSize, skyboxSize, 1),
+    parent: skyboxRoot
+  })
+  MeshRenderer.setPlane(skyboxNY)
+  Material.setBasicMaterial(skyboxNY, {
+    texture: Material.Texture.Common({ src: 'images/creepy-skybox/ny.png' })
+  })
+
+  // Right (PX) - facing inward (negative X direction)
+  const skyboxPX = engine.addEntity()
+  arenaEntities.push(skyboxPX)
+  Transform.create(skyboxPX, {
+    position: Vector3.create(skyboxSize / 2, 0, 0),
+    rotation: Quaternion.fromEulerDegrees(0, -90, 0), // Flip to face inward
+    scale: Vector3.create(skyboxSize, skyboxHeight, 1),
+    parent: skyboxRoot
+  })
+  MeshRenderer.setPlane(skyboxPX)
+  Material.setBasicMaterial(skyboxPX, {
+    texture: Material.Texture.Common({ src: 'images/creepy-skybox/nx.png' }) // Swapped PX and NX
+  })
+
+  // Left (NX) - facing inward (positive X direction)
+  const skyboxNX = engine.addEntity()
+  arenaEntities.push(skyboxNX)
+  Transform.create(skyboxNX, {
+    position: Vector3.create(-skyboxSize / 2, 0, 0),
+    rotation: Quaternion.fromEulerDegrees(0, 90, 0), // Flip to face inward
+    scale: Vector3.create(skyboxSize, skyboxHeight, 1),
+    parent: skyboxRoot
+  })
+  MeshRenderer.setPlane(skyboxNX)
+  Material.setBasicMaterial(skyboxNX, {
+    texture: Material.Texture.Common({ src: 'images/creepy-skybox/px.png' }) // Swapped PX and NX
+  })
+
+  console.log('✅ Skybox created (6 textured planes facing inward)')
+}
+
+/**
  * Create the fighting arena with floor and boundaries
  */
 export function createArena(): void {
   console.log('🥊 Creating fighting arena...')
 
-  // Create floor
-  const floor = engine.addEntity()
-  arenaEntities.push(floor)
+  // Create skybox first
+  createSkybox()
 
-  MeshRenderer.setBox(floor)
-  Transform.create(floor, {
-    position: Vector3.create(8, -0.05, 8), // Centered in 16x16 parcel
-    scale: Vector3.create(ARENA_CONFIG.width, ARENA_CONFIG.height, ARENA_CONFIG.depth)
-  })
-  Material.setPbrMaterial(floor, {
-    albedoColor: Color4.create(0.3, 0.3, 0.35, 1),
-    metallic: 0.2,
-    roughness: 0.8
-  })
-  MeshCollider.setBox(floor)
-
-  // Create boundary markers (visual guides)
-  createArenaMarkers()
+  // Floor removed - bottom skybox texture acts as ground
+  // Arena markers removed - clean immersive environment
 
   console.log('✅ Arena created')
-}
-
-/**
- * Create visual markers for spawn points and boundaries
- */
-function createArenaMarkers(): void {
-  // Player spawn marker (blue)
-  const playerMarker = engine.addEntity()
-  arenaEntities.push(playerMarker)
-  MeshRenderer.setCylinder(playerMarker)
-  Transform.create(playerMarker, {
-    position: Vector3.create(ARENA_CONFIG.player.x, 0.05, ARENA_CONFIG.player.z),
-    scale: Vector3.create(1, 0.1, 1)
-  })
-  Material.setPbrMaterial(playerMarker, {
-    albedoColor: Color4.Blue()
-  })
-
-  // Enemy spawn marker (red)
-  const enemyMarker = engine.addEntity()
-  arenaEntities.push(enemyMarker)
-  MeshRenderer.setCylinder(enemyMarker)
-  Transform.create(enemyMarker, {
-    position: Vector3.create(ARENA_CONFIG.enemy.x, 0.05, ARENA_CONFIG.enemy.z),
-    scale: Vector3.create(1, 0.1, 1)
-  })
-  Material.setPbrMaterial(enemyMarker, {
-    albedoColor: Color4.Red()
-  })
-
-  // Center line (yellow divider)
-  const centerLine = engine.addEntity()
-  arenaEntities.push(centerLine)
-  MeshRenderer.setBox(centerLine)
-  Transform.create(centerLine, {
-    position: Vector3.create(8, 0.06, 8), // Centered in parcel
-    scale: Vector3.create(0.1, 0.05, ARENA_CONFIG.depth)
-  })
-  Material.setPbrMaterial(centerLine, {
-    albedoColor: Color4.Yellow()
-  })
 }
 
 /**

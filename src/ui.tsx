@@ -41,34 +41,36 @@ const uiComponent = () => {
         flexDirection: 'column',
       }}
     >
-      {/* Top HUD Container */}
+      {/* Top HUD Container - Centered and Compact */}
       <UiEntity
         uiTransform={{
           width: '100%',
           height: 120,
           flexDirection: 'row',
-          justifyContent: 'space-between',
+          justifyContent: 'center',
+          alignItems: 'center',
           padding: 20,
         }}
       >
         {/* Player 1 Health Bar (Left) */}
         <UiEntity
           uiTransform={{
-            width: 400,
+            width: 280,
             height: 100,
             flexDirection: 'column',
+            margin: { right: 15 }
           }}
         >
           <Label
             value="BANDIT (PLAYER)"
-            fontSize={20}
+            fontSize={16}
             color={Color4.White()}
-            uiTransform={{ width: '100%', height: 30, margin: {bottom: 5} }}
+            uiTransform={{ width: '100%', height: 25, margin: {bottom: 5} }}
           />
           <UiEntity
             uiTransform={{
               width: '100%',
-              height: 40,
+              height: 35,
               margin: { bottom: 5 }
             }}
             uiBackground={{ color: Color4.create(0.2, 0.2, 0.2, 0.8) }}
@@ -82,8 +84,8 @@ const uiComponent = () => {
             />
           </UiEntity>
           <Label
-            value={`HP: ${p1Health}/${p1MaxHealth} | ${p1Anim.toUpperCase()}${playerFighter && playerFighter.blocking ? ' | 🛡️ BLOCKING' : ''}`}
-            fontSize={14}
+            value={`HP: ${p1Health}/${p1MaxHealth}${playerFighter && playerFighter.blocking ? ' | 🛡️ BLOCK' : ''}`}
+            fontSize={12}
             color={playerFighter && playerFighter.blocking ? Color4.create(0.3, 0.8, 1, 1) : Color4.White()}
             uiTransform={{ width: '100%', height: 20 }}
           />
@@ -92,7 +94,7 @@ const uiComponent = () => {
         {/* Center - VS Text & Combo Counter */}
         <UiEntity
           uiTransform={{
-            width: 150,
+            width: 120,
             height: 100,
             flexDirection: 'column',
             alignItems: 'center',
@@ -107,8 +109,8 @@ const uiComponent = () => {
           />
           {comboCount > 1 && (
             <Label
-              value={`${comboCount} HIT COMBO!`}
-              fontSize={20}
+              value={`${comboCount} COMBO!`}
+              fontSize={18}
               color={Color4.create(1, 0.5, 0, 1)}
               uiTransform={{ width: '100%', height: 30 }}
             />
@@ -118,22 +120,23 @@ const uiComponent = () => {
         {/* Player 2 Health Bar (Right) */}
         <UiEntity
           uiTransform={{
-            width: 400,
+            width: 280,
             height: 100,
             flexDirection: 'column',
             alignItems: 'flex-end',
+            margin: { left: 15 }
           }}
         >
           <Label
             value="GOBLIN (AI)"
-            fontSize={20}
+            fontSize={16}
             color={Color4.White()}
-            uiTransform={{ width: '100%', height: 30, margin: {bottom: 5} }}
+            uiTransform={{ width: '100%', height: 25, margin: {bottom: 5} }}
           />
           <UiEntity
             uiTransform={{
               width: '100%',
-              height: 40,
+              height: 35,
               margin: { bottom: 5 }
             }}
             uiBackground={{ color: Color4.create(0.2, 0.2, 0.2, 0.8) }}
@@ -147,56 +150,12 @@ const uiComponent = () => {
             />
           </UiEntity>
           <Label
-            value={`HP: ${p2Health}/${p2MaxHealth} | ${p2Anim.toUpperCase()}${enemyFighter && enemyFighter.blocking ? ' | 🛡️ BLOCKING' : ''}`}
-            fontSize={14}
+            value={`HP: ${p2Health}/${p2MaxHealth}${enemyFighter && enemyFighter.blocking ? ' | 🛡️ BLOCK' : ''}`}
+            fontSize={12}
             color={enemyFighter && enemyFighter.blocking ? Color4.create(0.3, 0.8, 1, 1) : Color4.White()}
             uiTransform={{ width: '100%', height: 20 }}
           />
         </UiEntity>
-      </UiEntity>
-
-      {/* Controls Hint (Bottom) */}
-      <UiEntity
-        uiTransform={{
-          width: 600,
-          height: 180,
-          position: { bottom: 20, left: '50%' },
-          positionType: 'absolute',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-        uiBackground={{ color: Color4.create(0, 0, 0, 0.7) }}
-      >
-        <Label
-          value="CONTROLS"
-          fontSize={18}
-          color={Color4.Yellow()}
-          uiTransform={{ width: '100%', height: 30, margin: {top: 10} }}
-        />
-              <Label
-                value="WASD - Move | E - Attack | F - Block"
-                fontSize={14}
-                color={Color4.White()}
-                uiTransform={{ width: '100%', height: 25 }}
-              />
-              <Label
-                value="Block reduces damage by 50% | AI will block smart!"
-                fontSize={12}
-                color={Color4.Gray()}
-                uiTransform={{ width: '100%', height: 25 }}
-              />
-        <Label
-          value="Enemy AI will chase and attack you!"
-          fontSize={12}
-          color={Color4.create(1, 0.5, 0.5, 1)}
-          uiTransform={{ width: '100%', height: 25 }}
-        />
-        <Label
-          value="Animations play based on your actions"
-          fontSize={11}
-          color={Color4.create(0.7, 0.7, 0.7, 1)}
-          uiTransform={{ width: '100%', height: 25 }}
-        />
       </UiEntity>
 
       {/* Countdown Overlay */}
