@@ -8,7 +8,7 @@ let gameStateEntity: Entity | null = null
 // Animation states that all fighters should have
 const FIGHTER_ANIMATIONS = [
   { clip: 'idle', playing: true, loop: true },
-  { clip: 'run', playing: false, loop: true },
+  { clip: 'walk', playing: false, loop: true },
   { clip: 'attack', playing: false, loop: false },
   { clip: 'impact', playing: false, loop: false },
   { clip: 'stun', playing: false, loop: false },
@@ -40,9 +40,16 @@ export function getGameState(): Entity | null {
 }
 
 /**
+ * Reset game state reference (used when returning to main menu)
+ */
+export function resetGameState(): void {
+  gameStateEntity = null
+}
+
+/**
  * Create simple skybox cube around the arena using textured planes
  */
-function createSkybox(): void {
+function createSkybox(skyboxFolder: string): void {
   const skyboxSize = 15 // Fits within 1 parcel (16x16)
   const skyboxHeight = 12
   const skyboxRoot = engine.addEntity()
@@ -51,6 +58,9 @@ function createSkybox(): void {
   Transform.create(skyboxRoot, {
     position: Vector3.create(8, 6, 8) // Centered at arena position
   })
+
+  // Different texture mapping for different skyboxes
+  const isCreepy = skyboxFolder.includes('creepy-skybox')
 
   // Front (PZ) - facing inward (negative Z direction)
   const skyboxPZ = engine.addEntity()
@@ -63,7 +73,7 @@ function createSkybox(): void {
   })
   MeshRenderer.setPlane(skyboxPZ)
   Material.setBasicMaterial(skyboxPZ, {
-    texture: Material.Texture.Common({ src: 'images/creepy-skybox/nz.png' }) // Swapped NZ and PZ
+    texture: Material.Texture.Common({ src: `${skyboxFolder}/${isCreepy ? 'nz' : 'pz'}.png` })
   })
 
   // Back (NZ) - facing inward (positive Z direction)
@@ -77,7 +87,7 @@ function createSkybox(): void {
   })
   MeshRenderer.setPlane(skyboxNZ)
   Material.setBasicMaterial(skyboxNZ, {
-    texture: Material.Texture.Common({ src: 'images/creepy-skybox/pz.png' }) // Swapped NZ and PZ
+    texture: Material.Texture.Common({ src: `${skyboxFolder}/${isCreepy ? 'pz' : 'nz'}.png` })
   })
 
   // Top (PY) - facing down
@@ -91,7 +101,7 @@ function createSkybox(): void {
   })
   MeshRenderer.setPlane(skyboxPY)
   Material.setBasicMaterial(skyboxPY, {
-    texture: Material.Texture.Common({ src: 'images/creepy-skybox/py.png' })
+    texture: Material.Texture.Common({ src: `${skyboxFolder}/py.png` })
   })
 
   // Bottom (NY) - facing up
@@ -105,7 +115,7 @@ function createSkybox(): void {
   })
   MeshRenderer.setPlane(skyboxNY)
   Material.setBasicMaterial(skyboxNY, {
-    texture: Material.Texture.Common({ src: 'images/creepy-skybox/ny.png' })
+    texture: Material.Texture.Common({ src: `${skyboxFolder}/ny.png` })
   })
 
   // Right (PX) - facing inward (negative X direction)
@@ -119,7 +129,7 @@ function createSkybox(): void {
   })
   MeshRenderer.setPlane(skyboxPX)
   Material.setBasicMaterial(skyboxPX, {
-    texture: Material.Texture.Common({ src: 'images/creepy-skybox/nx.png' }) // Swapped PX and NX
+    texture: Material.Texture.Common({ src: `${skyboxFolder}/nx.png` }) // Swapped PX and NX
   })
 
   // Left (NX) - facing inward (positive X direction)
@@ -133,7 +143,7 @@ function createSkybox(): void {
   })
   MeshRenderer.setPlane(skyboxNX)
   Material.setBasicMaterial(skyboxNX, {
-    texture: Material.Texture.Common({ src: 'images/creepy-skybox/px.png' }) // Swapped PX and NX
+    texture: Material.Texture.Common({ src: `${skyboxFolder}/px.png` }) // Swapped PX and NX
   })
 
   console.log('✅ Skybox created (6 textured planes facing inward)')
@@ -142,16 +152,16 @@ function createSkybox(): void {
 /**
  * Create the fighting arena with floor and boundaries
  */
-export function createArena(): void {
+export function createArena(skyboxFolder: string = 'images/creepy-skybox'): void {
   console.log('🥊 Creating fighting arena...')
 
   // Create skybox first
-  createSkybox()
+  createSkybox(skyboxFolder)
 
   // Floor removed - bottom skybox texture acts as ground
   // Arena markers removed - clean immersive environment
 
-  console.log('✅ Arena created')
+  console.log(`✅ Arena created with skybox: ${skyboxFolder}`)
 }
 
 /**
@@ -183,7 +193,7 @@ export function createFighter(modelPath: string, position: Vector3, rotation: Qu
   Transform.create(entity, {
     position: position,
     rotation: rotation,
-    scale: Vector3.One()
+    scale: Vector3.create(1, 1, 1) // 2x larger
   })
 
   // Fighter component
@@ -201,8 +211,7 @@ export function createFighter(modelPath: string, position: Vector3, rotation: Qu
     knockbackProgress: 0,
     knockbackDirX: 0,
     knockbackDirY: 0,
-    knockbackDirZ: 0,
-    animRampProgress: 1.0
+    knockbackDirZ: 0
   })
 
   // Animator with standard states

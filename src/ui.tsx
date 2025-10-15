@@ -6,12 +6,23 @@ import ReactEcs, { Label, ReactEcsRenderer, UiEntity, Button } from '@dcl/sdk/re
 import { FighterComponent, GameState } from './components'
 import { getPlayerEntity, getEnemyEntity, resetMatch } from './systems'
 import { getGameState } from './factory'
+import { returnToMainMenu } from './menuSystem'
+import { MenuStateComponent, getMenuState } from './menuState'
 
 export function setupUi() {
-  ReactEcsRenderer.setUiRenderer(uiComponent)
+  ReactEcsRenderer.setUiRenderer(battleUiComponent)
 }
 
-const uiComponent = () => {
+export const battleUiComponent = () => {
+  // Check if we're in battle mode
+  const menuStateEntity = getMenuState()
+  const menuState = menuStateEntity ? MenuStateComponent.getOrNull(menuStateEntity) : null
+  
+  // Only show battle UI when in battle
+  if (!menuState || menuState.currentScreen !== 'battle') {
+    return null
+  }
+  
   const playerEntity = getPlayerEntity()
   const enemyEntity = getEnemyEntity()
   const gameStateEntity = getGameState()
@@ -247,14 +258,15 @@ const uiComponent = () => {
               }}
             />
             
-            {/* Main Menu Button (placeholder) */}
+            {/* Main Menu Button */}
             <Button
-              value="MAIN MENU (Coming Soon)"
+              value="MAIN MENU"
               variant="secondary"
               uiTransform={{ width: 300, height: 40, margin: { top: 10 } }}
               fontSize={14}
               onMouseDown={() => {
-                console.log('⚠️ Main menu not implemented yet')
+                console.log('🔙 Returning to main menu')
+                returnToMainMenu()
               }}
             />
           </UiEntity>

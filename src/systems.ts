@@ -246,15 +246,10 @@ export function playerMovementSystem(dt: number) {
 
     transform.position = newPosition
 
-    // Play run animation
-    if (fighter.currentAnimation !== 'run') {
-      playAnimation(player, 'run')
+    // Play walk animation
+    if (fighter.currentAnimation !== 'walk') {
+      playAnimation(player, 'walk')
     }
-
-    // Smooth rotation toward movement direction
-    const moveAngle = Math.atan2(moveX, moveZ) * (180 / Math.PI)
-    const targetRotation = Quaternion.fromEulerDegrees(0, moveAngle, 0)
-    transform.rotation = Quaternion.slerp(transform.rotation, targetRotation, dt * 5)
   } else if (fighter.currentAnimation !== 'idle' && !isBlocking) {
     // Return to idle when not moving (and not blocking)
     playAnimation(player, 'idle')
@@ -452,7 +447,6 @@ export function resetMatch() {
       playerFighter.knockbackDirX = 0
       playerFighter.knockbackDirY = 0
       playerFighter.knockbackDirZ = 0
-      playerFighter.animRampProgress = 1.0
       playerTransform.position = Vector3.create(ARENA_CONFIG.player.x, ARENA_CONFIG.player.y, ARENA_CONFIG.player.z)
       playerTransform.rotation = Quaternion.fromEulerDegrees(0, 90, 0)
 
@@ -486,7 +480,6 @@ export function resetMatch() {
       enemyFighter.knockbackDirX = 0
       enemyFighter.knockbackDirY = 0
       enemyFighter.knockbackDirZ = 0
-      enemyFighter.animRampProgress = 1.0
       enemyTransform.position = Vector3.create(ARENA_CONFIG.enemy.x, ARENA_CONFIG.enemy.y, ARENA_CONFIG.enemy.z)
       enemyTransform.rotation = Quaternion.fromEulerDegrees(0, -90, 0)
 
@@ -621,8 +614,8 @@ export function enemyAISystem(dt: number) {
 
       enemyTransform.position = newPosition
 
-      if (enemyFighter.currentAnimation !== 'run') {
-        playAnimation(enemy, 'run')
+      if (enemyFighter.currentAnimation !== 'walk') {
+        playAnimation(enemy, 'walk')
       }
     } else if (distance <= 2.3) {
       // In attack range - MUCH more aggressive (slightly beyond HIT_RANGE for pressure)
@@ -642,26 +635,39 @@ export function enemyAISystem(dt: number) {
       }
     }
   }
-
-  // Smooth facing toward player
-  const toPlayer = Vector3.subtract(playerTransform.position, enemyTransform.position)
-  toPlayer.y = 0
-  if (Vector3.length(toPlayer) > 0.1) {
-    const angle = Math.atan2(toPlayer.x, toPlayer.z) * (180 / Math.PI)
-    const targetRotation = Quaternion.fromEulerDegrees(0, angle, 0)
-    enemyTransform.rotation = Quaternion.slerp(enemyTransform.rotation, targetRotation, dt * 3)
-  }
 }
 
 /**
- * Facing system - enemy already faces player in enemyAISystem
- * Player faces movement direction in playerMovementSystem
- * This system is kept for compatibility but does nothing
+ * Facing system - makes both fighters always face each other (like Street Fighter/Tekken)
  */
 export function facingSystem(dt: number) {
-  // Facing is now handled in individual movement systems
-  // Enemy: handled in enemyAISystem
-  // Player: handled in playerMovementSystem
+  const player = getFighterByRole(true)
+  const enemy = getFighterByRole(false)
+
+  if (!player || !enemy) return
+
+  const playerTransform = Transform.getMutableOrNull(player)
+  const enemyTransform = Transform.getMutableOrNull(enemy)
+
+  if (!playerTransform || !enemyTransform) return
+
+  // Make player face enemy
+  const toEnemy = Vector3.subtract(enemyTransform.position, playerTransform.position)
+  toEnemy.y = 0
+  if (Vector3.length(toEnemy) > 0.1) {
+    const playerAngle = Math.atan2(toEnemy.x, toEnemy.z) * (180 / Math.PI)
+    const playerTargetRotation = Quaternion.fromEulerDegrees(0, playerAngle, 0)
+    playerTransform.rotation = Quaternion.slerp(playerTransform.rotation, playerTargetRotation, dt * 10)
+  }
+
+  // Make enemy face player
+  const toPlayer = Vector3.subtract(playerTransform.position, enemyTransform.position)
+  toPlayer.y = 0
+  if (Vector3.length(toPlayer) > 0.1) {
+    const enemyAngle = Math.atan2(toPlayer.x, toPlayer.z) * (180 / Math.PI)
+    const enemyTargetRotation = Quaternion.fromEulerDegrees(0, enemyAngle, 0)
+    enemyTransform.rotation = Quaternion.slerp(enemyTransform.rotation, enemyTargetRotation, dt * 10)
+  }
 }
 
 // Legacy exports for compatibility

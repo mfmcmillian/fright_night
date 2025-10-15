@@ -1,7 +1,7 @@
 import { Schemas, engine } from '@dcl/sdk/ecs'
 
 // Animation states
-export type AnimationState = 'idle' | 'run' | 'attack' | 'impact' | 'stun' | 'die' | 'block'
+export type AnimationState = 'idle' | 'walk' | 'attack' | 'impact' | 'stun' | 'die' | 'block'
 
 // Fighter component - ECS-based fighter data
 export const FighterComponent = engine.defineComponent('fighter::component', {
@@ -18,8 +18,7 @@ export const FighterComponent = engine.defineComponent('fighter::component', {
   knockbackProgress: Schemas.Number, // 0-1 progress through knockback
   knockbackDirX: Schemas.Number, // Knockback direction X
   knockbackDirY: Schemas.Number, // Knockback direction Y
-  knockbackDirZ: Schemas.Number, // Knockback direction Z
-  animRampProgress: Schemas.Number // 0-1 for smooth animation speed ramp (0.1s blend)
+  knockbackDirZ: Schemas.Number // Knockback direction Z
 })
 
 // Animation timer component - tracks when to reset animations
